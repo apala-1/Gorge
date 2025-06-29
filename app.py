@@ -4,6 +4,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 import re
 import random
+from langdetect import detect
+from googletrans import Translator
 
 # Load model and tokenizer (takes ~30 secs the first time)
 tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-small")
@@ -12,6 +14,28 @@ model = AutoModelForCausalLM.from_pretrained("microsoft/DialoGPT-small")
 # Set up Flask
 app = Flask(__name__)
 CORS(app)
+
+translator = Translator()
+
+def translate_to_english(text):
+    translated = translator.translate(text, src = 'auto', dest = 'en')
+    return translated.text
+
+def detect_language(text):
+    try:
+        return detect(text)
+    except:
+        return 'en'
+    
+def preprocess_user_input(user_input):
+    lang = detect_language(user_input)
+    print(f"Detected language: {lang}")  # Debugging the language detection
+    if lang != 'en':  # If the language is not English
+        translated_input = translate_to_english(user_input)  # Translate Nepali to English
+        print(f"Original: {user_input} | Translated: {translated_input}")
+        return translated_input, lang
+    return user_input, lang
+
 
 # Normalizing greetings function (Step 1)
 def normalize_greeting(text):
@@ -75,15 +99,21 @@ faq_keywords = {
     "talk": "can i talk to you when i feel sad"
 }
 
+last_bot_repsonse = ""
+
 @app.route('/chat', methods=['POST'])
 def chat():
+    global last_bot_repsonse
     data = request.get_json()
+
     user_input = data.get("message")
 
-    # Normalize user input
-    normalized_input = normalize_greeting(user_input)
-    normalized_input = normalized_input.strip().lower()
-    
+# First, detect and translate if needed
+    processed_input, lang = preprocess_user_input(user_input)
+
+# Then normalize it
+    normalized_input = normalize_greeting(processed_input).strip().lower()
+
     for keyword, faq_key in faq_keywords.items():
         if keyword in normalized_input:
             return jsonify({"reply": faq_responses[faq_key] })
@@ -102,6 +132,9 @@ def chat():
         ]
         bot_reply = random.choice(greetings_responses)
     
+    elif "how are you" in normalized_input:
+        bot_reply = "I'm doing great, thanks for asking! How about you?"
+
      # to check if it is a known FAQ
     elif normalized_input in faq_responses:
         bot_reply = faq_responses[normalized_input]
@@ -126,7 +159,10 @@ def chat():
     
     else:
         # Encode user input and add end-of-string token for non-greeting responses
-        inputs = tokenizer.encode(normalized_input + tokenizer.eos_token, return_tensors="pt")
+        # Include the last bot reply in the prompt
+        prompt = f"User: {normalized_input}\nBot: {last_bot_repsonse}"
+        inputs = tokenizer.encode(prompt + tokenizer.eos_token, return_tensors="pt")
+
 
         # Generate response using model
         attention_mask = torch.ones(inputs.shape, dtype=torch.long)
@@ -138,7 +174,7 @@ def chat():
         )
 
         bot_reply = tokenizer.decode(response_ids[:, inputs.shape[-1]:][0], skip_special_tokens=True)
-
+        last_bot_repsonse = bot_reply
     return jsonify({"reply": bot_reply})
 
 if __name__ == '__main__':
