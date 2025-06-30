@@ -52,11 +52,20 @@ h1 {
 .user {
   text-align: right;
   color: #00ccff;
+  margin: 5px 0;
 }
 
 .bot {
   text-align: left;
   color: #00ff77;
+  margin: 5px 0;
+}
+
+#typingIndicator {
+  font-style: italic;
+  color: gray;
+  display: none;
+  font-size: 13px;
 }
 
 #messageInput {
@@ -94,4 +103,23 @@ h1 {
 #messageInput:focus, #sendBtn:focus {
   outline: none;
   box-shadow: 0 0 10px rgba(0, 204, 255, 0.7);
+}
+
+.emoji-container {
+  position: absolute;
+  bottom: 120px;
+  right: 30px;
+}
+
+#emojiBtn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #00ccff;
+  transition: transform 0.2s ease;
+}
+
+#emojiBtn:hover {
+  transform: scale(1.3);
 }
